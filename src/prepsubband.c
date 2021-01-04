@@ -10,7 +10,7 @@
 #include <omp.h>
 #endif
 
-#define RAWDATA (cmd->filterbankP || cmd->psrfitsP)
+#define RAWDATA (cmd->filterbankP || cmd->psrfitsP) //是否经过修改
 
 /* This causes the barycentric motion to be calculated once per TDT sec */
 #define TDT 20.0
@@ -140,8 +140,8 @@ int main(int argc, char *argv[])
         if (cmd->filterbankP)
             s.datatype = SIGPROCFB;
         else if (cmd->psrfitsP)
-            s.datatype = PSRFITS;
-    } else {                    // Attempt to auto-identify the data
+            s.datatype = PSRFITS; //检测数据格式
+    } else {                    // Attempt to auto-identify the data 自动检测数据，SIG/PSR/SUB
         identify_psrdatatype(&s, 1);
         if (s.datatype == SIGPROCFB)
             cmd->filterbankP = 1;
@@ -156,15 +156,15 @@ int main(int argc, char *argv[])
         }
     }
 
-    if (!RAWDATA)
-        s.files = (FILE **) malloc(sizeof(FILE *) * s.num_files);
+    if (!RAWDATA) 
+        s.files = (FILE **) malloc(sizeof(FILE *) * s.num_files); 
     if (RAWDATA || insubs) {
         char description[40];
         psrdatatype_description(description, s.datatype);
         if (s.num_files > 1)
             printf("Reading %s data from %d files:\n", description, s.num_files);
         else
-            printf("Reading %s data from 1 file:\n", description);
+            printf("Reading %s data from 1 file:\n", description);  //读取文件内容
         for (ii = 0; ii < s.num_files; ii++) {
             printf("  '%s'\n", cmd->argv[ii]);
             if (insubs)
@@ -172,16 +172,16 @@ int main(int argc, char *argv[])
         }
         printf("\n");
         if (RAWDATA) {
-            read_rawdata_files(&s);
+            read_rawdata_files(&s); //预先知道channels数量
             // Make sure that the requested number of subbands divides into the
             // the raw number of channels.
-            if (s.num_channels % cmd->nsub) {
+            if (s.num_channels % cmd->nsub) { //channels的个数必须被nsub整除
                 printf("Error:  The number of subbands (-nsub %d) must divide into the\n"
                        "        number of channels (%d)\n\n",
                        cmd->nsub, s.num_channels);
                 exit(1);
             }
-            if (cmd->ignorechanstrP) {
+            if (cmd->ignorechanstrP) {  //如果要求忽略?这个通道,
                 s.ignorechans = get_ignorechans(cmd->ignorechanstr, 0, s.num_channels-1,
                                                 &s.num_ignorechans, &s.ignorechans_str);
                 if (s.ignorechans_str==NULL) {
@@ -191,8 +191,8 @@ int main(int argc, char *argv[])
             }
             print_spectra_info_summary(&s);
             spectra_info_to_inf(&s, &idata);
-        } else {                // insubs
-            cmd->nsub = s.num_files;
+        } else {                // insubs  不是RAWDATA,而是SUB数据
+            cmd->nsub = s.num_files;  
             s.N = chkfilelen(s.files[0], sizeof(short));
             s.padvals = gen_fvect(s.num_files);
             for (ii = 0; ii < s.num_files; ii++)
