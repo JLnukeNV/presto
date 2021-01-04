@@ -10,7 +10,7 @@
 #include <omp.h>
 #endif
 
-#define RAWDATA (cmd->filterbankP || cmd->psrfitsP)
+#define RAWDATA (cmd->filterbankP || cmd->psrfitsP) //是不是原始数据
 
 /* This causes the barycentric motion to be calculated once per TDT sec */
 #define TDT 20.0
@@ -138,10 +138,10 @@ int main(int argc, char *argv[])
 
     if (RAWDATA) {
         if (cmd->filterbankP)
-            s.datatype = SIGPROCFB;
+            s.datatype = SIGPROCFB; //是原始数据的话，判断数据类型
         else if (cmd->psrfitsP)
             s.datatype = PSRFITS;
-    } else {                    // Attempt to auto-identify the data
+    } else {                    // Attempt to auto-identify the data ，否则，自动检测数据类型SIG/PSR/SUB
         identify_psrdatatype(&s, 1);
         if (s.datatype == SIGPROCFB)
             cmd->filterbankP = 1;
@@ -158,7 +158,7 @@ int main(int argc, char *argv[])
 
     if (!RAWDATA)
         s.files = (FILE **) malloc(sizeof(FILE *) * s.num_files);
-    if (RAWDATA || insubs) {
+    if (RAWDATA || insubs) {  //是原始数据或者SUBBAND数据，读取文件内容
         char description[40];
         psrdatatype_description(description, s.datatype);
         if (s.num_files > 1)
@@ -175,13 +175,13 @@ int main(int argc, char *argv[])
             read_rawdata_files(&s);
             // Make sure that the requested number of subbands divides into the
             // the raw number of channels.
-            if (s.num_channels % cmd->nsub) {
+            if (s.num_channels % cmd->nsub) { //通道数channels可以被nsub整除
                 printf("Error:  The number of subbands (-nsub %d) must divide into the\n"
                        "        number of channels (%d)\n\n",
                        cmd->nsub, s.num_channels);
                 exit(1);
             }
-            if (cmd->ignorechanstrP) {
+            if (cmd->ignorechanstrP) {  //如果要求忽略？某通道
                 s.ignorechans = get_ignorechans(cmd->ignorechanstr, 0, s.num_channels-1,
                                                 &s.num_ignorechans, &s.ignorechans_str);
                 if (s.ignorechans_str==NULL) {
@@ -191,7 +191,7 @@ int main(int argc, char *argv[])
             }
             print_spectra_info_summary(&s);
             spectra_info_to_inf(&s, &idata);
-        } else {                // insubs
+        } else {                // insubs SUBBNAD数据
             cmd->nsub = s.num_files;
             s.N = chkfilelen(s.files[0], sizeof(short));
             s.padvals = gen_fvect(s.num_files);
@@ -215,14 +215,14 @@ int main(int argc, char *argv[])
         }
     }
 
-    if (insubs) {
+    if (insubs) { //子带
         char *root, *suffix;
         if (split_root_suffix(s.filenames[0], &root, &suffix) == 0) {
             printf("Error:  The input filename (%s) must have a suffix!\n\n",
                    s.filenames[0]);
             exit(1);
         }
-        if (strncmp(suffix, "sub", 3) == 0) {
+        if (strncmp(suffix, "sub", 3) == 0) {  
             char *tmpname;
             tmpname = calloc(strlen(root) + 10, 1);
             sprintf(tmpname, "%s.sub", root);
@@ -268,12 +268,12 @@ int main(int argc, char *argv[])
         char format_str[30];
         int num_places;
 
-        if (!cmd->nobaryP) {
+        if (!cmd->nobaryP) {  //无重心
             printf("\nWarning:  You cannot (currently) barycenter subbands.\n"
                    "          Setting the '-nobary' flag automatically.\n");
             cmd->nobaryP = 1;
         }
-        printf("Writing subbands to:\n");
+        printf("Writing subbands to:\n"); //写入子带
         cmd->numdms = 1;
         dms = gen_dvect(cmd->numdms);
         dms[0] = cmd->subdm;
@@ -301,7 +301,7 @@ int main(int argc, char *argv[])
     blocksperread = ((int) (BW_ddelay / idata.dt) / s.spectra_per_subint + 1);
     worklen = s.spectra_per_subint * blocksperread;
     /* The number of topo to bary time points to generate with TEMPO */
-    numbarypts = (int) (s.T * 1.1 / TDT + 5.5) + 1;
+    numbarypts = (int) (s.T * 1.1 / TDT + 5.5) + 1; //中心个数？
 
     // Identify the TEMPO observatory code
     {
@@ -310,7 +310,7 @@ int main(int argc, char *argv[])
         free(outscope);
     }
 
-    /* If we are offsetting into the file, change inf file start time */
+    /* If we are offsetting into the file, change inf file start time 更改起始时间*/  
     if (cmd->start > 0.0 || cmd->offset > 0) {
         if (cmd->start > 0.0) /* Offset in units of worklen */
             cmd->offset = (long) (cmd->start *
@@ -328,13 +328,13 @@ int main(int argc, char *argv[])
         }
     }
 
-    if (cmd->nsub > s.num_channels) {
+    if (cmd->nsub > s.num_channels) { //子带数是否大于通道数
         printf
             ("Warning:  The number of requested subbands (%d) is larger than the number of channels (%d).\n",
              cmd->nsub, s.num_channels);
         printf("          Re-setting the number of subbands to %d.\n\n",
                s.num_channels);
-        cmd->nsub = s.num_channels;
+        cmd->nsub = s.num_channels; //子带数最多等于通道数
     }
 
     if (s.spectra_per_subint % cmd->downsamp) {
