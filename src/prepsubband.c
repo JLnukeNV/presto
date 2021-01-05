@@ -195,6 +195,7 @@ int main(int argc, char *argv[])
             cmd->nsub = s.num_files;
             s.N = chkfilelen(s.files[0], sizeof(short));
             s.padvals = gen_fvect(s.num_files);
+            #pragma omp parrllel for simd
             for (ii = 0; ii < s.num_files; ii++)
                 s.padvals[ii] = 0.0;
             s.start_MJD = (long double *) malloc(sizeof(long double));
@@ -255,6 +256,7 @@ int main(int argc, char *argv[])
         printf("Writing output data to:\n");
         outfiles = (FILE **) malloc(cmd->numdms * sizeof(FILE *));
         dms = gen_dvect(cmd->numdms);
+        #pragma omp parallel for schedule(static)
         for (ii = 0; ii < cmd->numdms; ii++) {
             dms[ii] = cmd->lodm + ii * cmd->dmstep;
             avgdm += dms[ii];
@@ -366,6 +368,7 @@ int main(int argc, char *argv[])
         dispdt = subband_search_delays(s.num_channels, cmd->nsub, avgdm,
                                        idata.freq, idata.chan_wid, 0.0);
         idispdt = gen_ivect(s.num_channels);
+        #pragma omp parallel for simd schedule(static) 
         for (ii = 0; ii < s.num_channels; ii++) //loop to find nearest ?
             idispdt[ii] = NEAREST_LONG(dispdt[ii] / idata.dt);
         vect_free(dispdt);
@@ -373,7 +376,7 @@ int main(int argc, char *argv[])
         /* The subband dispersion delays (see note above) */
 
         offsets = gen_imatrix(cmd->numdms, cmd->nsub);
-        #pragma omp parallel for shared(offsets) schedule(dynamic)
+        #pragma omp parallel for simd shared(offsets) schedule(dynamic)
         for (ii = 0; ii < cmd->numdms; ii++) {  //可优化二层循环2  先遍历dm，再遍历子带
             double *subdispdt;
 
@@ -423,6 +426,7 @@ int main(int argc, char *argv[])
             /* Update the statistics */
 
             if (!padding && !cmd->subP) {
+            	#pragma omp parallel for schedule(static)
                 for (ii = 0; ii < numtowrite; ii++)
                     update_stats(statnum + ii, outdata[0][ii], &min, &max, &avg,
                                  &var);
@@ -456,7 +460,7 @@ int main(int argc, char *argv[])
         btoa = gen_dvect(numbarypts);
         ttoa = gen_dvect(numbarypts);
         voverc = gen_dvect(numbarypts);
-        #pragma omp parallel for shared(ttoa,tlotoa) schedule(dynamic)
+        #pragma omp parallel for simd shared(ttoa,tlotoa) schedule(dynamic) 
         for (ii = 0; ii < numbarypts; ii++)
             ttoa[ii] = tlotoa + TDT * ii / SECPERDAY;
 
@@ -464,7 +468,7 @@ int main(int argc, char *argv[])
 
         printf("\nGenerating barycentric corrections...\n");
         barycenter(ttoa, btoa, voverc, numbarypts, rastring, decstring, obs, ephem);
-        #pragma omp parallel for shared(voverc) schedule(dynamic) reduction(+:avgvoverc)
+        #pragma omp parallel for simd shared(voverc) schedule(dynamic) reduction(+:avgvoverc)
         for (ii = 0; ii < numbarypts; ii++) {
             if (voverc[ii] > maxvoverc)
                 maxvoverc = voverc[ii];
@@ -508,6 +512,7 @@ int main(int argc, char *argv[])
             subdispdt = subband_delays(s.num_channels, cmd->nsub, dms[ii],
                                        idata.freq, idata.chan_wid, avgvoverc);
             dtmp = subdispdt[cmd->nsub - 1];
+            #pragma omp simd
             for (jj = 0; jj < cmd->nsub; jj++)
                 offsets[ii][jj] = NEAREST_LONG((subdispdt[jj] - dtmp) / dsdt);
             vect_free(subdispdt);
@@ -517,7 +522,7 @@ int main(int argc, char *argv[])
         /* units of bin length (dt) rounded to the nearest integer.   */
 
         dtmp = (btoa[0] - ttoa[0]);
-        #pragma omp parallel for shared(btoa,ttoa,dtmp) schedule(dynamic)
+        #pragma omp parallel for simd shared(btoa,ttoa,dtmp) schedule(dynamic)
         for (ii = 0; ii < numbarypts; ii++)
             btoa[ii] = ((btoa[ii] - ttoa[ii]) - dtmp) * SECPERDAY / dsdt;
 
@@ -529,7 +534,7 @@ int main(int argc, char *argv[])
             numdiffbins = labs(NEAREST_LONG(btoa[numbarypts - 1])) + 1;
             diffbins = gen_ivect(numdiffbins);
             diffbinptr = diffbins;
-            #pragma omp parallel for schedule(dynamic)
+            #pragma omp parallel for schedule(static)
             for (ii = 1; ii < numbarypts; ii++) {
                 currentbin = NEAREST_LONG(btoa[ii]);
                 if (currentbin != oldbin) {
@@ -700,7 +705,7 @@ int main(int argc, char *argv[])
 
     if (idata.numonoff >= 1) {
         int index, startpad, endpad;
-        #pragma omp parallel for schedule(dynamic)
+        #pragma omp parallel for simd schedule(dynamic)
         for (ii = 0; ii < cmd->numdms; ii++) {
             fclose(outfiles[ii]);
             sprintf(datafilenm, "%s_DM%.*f.dat", cmd->outfile, dmprecision, dms[ii]);
@@ -789,7 +794,7 @@ static void write_data(FILE * outfiles[], int numfiles, float **outdata,
                        int startpoint, int numtowrite)
 {
     int ii;
-    #pragma omp parallel for schedule(dynamic)
+    #pragma omp parallel for schedule(static)
     for (ii = 0; ii < numfiles; ii++)
         chkfwrite(outdata[ii] + startpoint, sizeof(float), numtowrite, outfiles[ii]);
 }
@@ -799,7 +804,7 @@ static void write_subs(FILE * outfiles[], int numfiles, short **subsdata,
                        int startpoint, int numtowrite)
 {
     int ii;
-    #pragma omp parallel for schedule(dynamic)
+    #pragma omp parallel for schedule(static)
     for (ii = 0; ii < numfiles; ii++)
         chkfwrite(subsdata[ii] + startpoint, sizeof(short), numtowrite,
                   outfiles[ii]);
@@ -821,20 +826,20 @@ static void write_padding(FILE * outfiles[], int numfiles, float value,
         float *buffer;
         veclen = (numtowrite > maxatonce) ? maxatonce : numtowrite;
         buffer = gen_fvect(veclen);
-        #pragma omp parallel for schedule(dynamic)
+        #pragma omp parallel for simd schedule(static)
         for (ii = 0; ii < veclen; ii++)
             buffer[ii] = value;
         if (veclen == numtowrite) {
-            #pragma omp parallel for schedule(dynamic)
+            #pragma omp parallel for schedule(static)
             for (ii = 0; ii < numfiles; ii++)
                 chkfwrite(buffer, sizeof(float), veclen, outfiles[ii]);
         } else {
-            #pragma omp parallel for schedule(dynamic)
+            #pragma omp parallel for schedule(staitc)
             for (ii = 0; ii < numtowrite / veclen; ii++) {
                 for (jj = 0; jj < numfiles; jj++)
                     chkfwrite(buffer, sizeof(float), veclen, outfiles[jj]);
             }
-            #pragma omp parallel for schedule(dynamic)
+            #pragma omp parallel for schedule(static)
             for (jj = 0; jj < numfiles; jj++)
                 chkfwrite(buffer, sizeof(float), numtowrite % veclen, outfiles[jj]);
         }
@@ -864,12 +869,15 @@ static int read_PRESTO_subbands(FILE * infiles[], int numfiles,
         numread = chkfread(subsdata, sizeof(short), SUBSBLOCKLEN, infiles[ii]);
         run_avg = 0.0;
         if (cmd->runavgP == 1) {
+            #pragma omp simd
             for (jj = 0; jj < numread; jj++)
                 run_avg += (float) subsdata[jj];
             run_avg /= numread;
         }
+        #pragma omp simd
         for (jj = 0, index = ii; jj < numread; jj++, index += numfiles)
             subbanddata[index] = (float) subsdata[jj] - run_avg;
+        #pragma omp simd
         for (jj = numread; jj < SUBSBLOCKLEN; jj++, index += numfiles)
             subbanddata[index] = 0.0;
     }
@@ -887,6 +895,7 @@ static int read_PRESTO_subbands(FILE * infiles[], int numfiles,
     /* Mask it if required */
     if (mask && numread) {
         if (*nummasked == -1) { /* If all channels are masked */
+            #pragma omp parallel for schedule(dynamic)
             for (ii = 0; ii < SUBSBLOCKLEN; ii++)
                 memcpy(subbanddata + ii * numfiles, padvals,
                        sizeof(float) * numfiles);
@@ -895,6 +904,7 @@ static int read_PRESTO_subbands(FILE * infiles[], int numfiles,
             #pragma omp parallel for schedule(dynamic)
             for (ii = 0; ii < SUBSBLOCKLEN; ii++) {
                 offset = ii * numfiles;
+                #pragma omp simd 
                 for (jj = 0; jj < *nummasked; jj++) {
                     channum = maskchans[jj];
                     subbanddata[offset + channum] = padvals[channum];
@@ -905,15 +915,17 @@ static int read_PRESTO_subbands(FILE * infiles[], int numfiles,
 
     /* Zero-DM removal if required */
     if (cmd->zerodmP == 1) {
+    	#pragma omp parallel for schedule(static)
         for (ii = 0; ii < SUBSBLOCKLEN; ii++) {
             offset = ii * numfiles;
             subband_sum = 0.0;
+            #pragma omp simd 
             for (jj = offset; jj < offset + numfiles; jj++) {
                 subband_sum += subbanddata[jj];
             }
             subband_sum /= (float) numfiles;
             /* Remove the channel average */
-            #pragma omp parallel for schedule(dynamic)
+            #pragma omp simd
             for (jj = offset; jj < offset + numfiles; jj++) {
                 subbanddata[jj] -= subband_sum;
             }
@@ -986,6 +998,7 @@ static int get_data(float **outdata, int blocksperread,
                 if (!firsttime)
                     totnumread += numread;
                 if (numread != s->spectra_per_subint) {
+                    #pragma omp simd
                     for (jj = ii * blocksize; jj < (ii + 1) * blocksize; jj++)
                         currentdata[jj] = 0.0;
                 }
@@ -1030,6 +1043,7 @@ static int get_data(float **outdata, int blocksperread,
         float infloat;
         #pragma omp parallel for schedule(dynamic)
         for (ii = 0; ii < cmd->nsub; ii++) {
+            #pragma omp simd
             for (jj = 0; jj < dsworklen; jj++) {
                 infloat = lastdsdata[ii + (cmd->nsub * jj)];
                 subsdata[ii][jj] = (short) (infloat + 0.5);
@@ -1117,7 +1131,6 @@ static void update_infodata(infodata * idata, long datawrote, long padwrote,
     }
 
     /* Now cut off the extra onoff bins */
-    #pragma omp parallel for schedule(dynamic)
     for (ii = 1, index = 1; ii <= idata->numonoff; ii++, index += 2) {
         if (idata->onoff[index - 1] > idata->N - 1) {
             idata->onoff[index - 1] = idata->N - 1;
