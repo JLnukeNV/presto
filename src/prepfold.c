@@ -894,6 +894,7 @@ int main(int argc, char *argv[])
 
     fprintf(stdout, "\n");
     filemarker = stdout;
+    #pragma omp parallel for schedule(static)
     for (ii = 0; ii < 1; ii++) {
         double p, pd, pdd;
 
@@ -965,8 +966,10 @@ int main(int argc, char *argv[])
     search.npart = cmd->npart;
     search.rawfolds = gen_dvect(cmd->nsub * cmd->npart * search.proflen);
     search.stats = (foldstats *) malloc(sizeof(foldstats) * cmd->nsub * cmd->npart);
+    #pragma omp parallel for schedule(static)
     for (ii = 0; ii < cmd->npart * cmd->nsub * search.proflen; ii++)
         search.rawfolds[ii] = 0.0;
+    #pragma omp parallel for schedule(static)
     for (ii = 0; ii < cmd->npart * cmd->nsub; ii++) {
         search.stats[ii].numdata = 0.0;
         search.stats[ii].data_avg = 0.0;
@@ -992,6 +995,7 @@ int main(int argc, char *argv[])
         tfdd = fdd / 6.0;
         dtmp = cmd->npart / T;
         parttimes = gen_dvect(cmd->npart);
+        #pragma omp parallel for schedule(static) 
         for (ii = 0; ii < numevents; ii++) {
             event = events[ii];
             if (binary) {
@@ -1021,6 +1025,7 @@ int main(int argc, char *argv[])
             else
                 search.orb.t = -search.orb.t / SECPERDAY + search.bepoch;
         }
+        #pragma omp parallel for schedule(static)
         for (ii = 0; ii < cmd->npart; ii++) {
             parttimes[ii] = (T * ii) / (double) (cmd->npart);
             /* Correct each part for the "exposure".  This gives us a count rate. */
@@ -1185,6 +1190,7 @@ int main(int argc, char *argv[])
             /* topocentric reference times.                   */
 
             if (binary) {
+                #pragma omp parallel for schedule(static)
                 for (ii = 0; ii < numbinpoints; ii++) {
                     arrayoffset++;      /* Beware nasty NR zero-offset kludges! */
                     dtmp = search.bepoch + tp[ii] / SECPERDAY;
@@ -1197,6 +1203,7 @@ int main(int argc, char *argv[])
                 }
                 numdelays = numbinpoints;
                 dtmp = tp[0];
+                #pragma omp parallel for schedule(static)
                 for (ii = 0; ii < numdelays; ii++)
                     tp[ii] = (tp[ii] - dtmp) * SECPERDAY;
             }
@@ -1222,6 +1229,7 @@ int main(int argc, char *argv[])
             search.lofreq = idata.freq;
             search.bestdm = idata.dm;
             search.chan_wid = idata.chan_wid;
+            #pragma omp parallel for schedule(static)
             for (ii = 1; ii < numchan; ii++)
                 obsf[ii] = obsf[0] + ii * idata.chan_wid;
             if (RAWDATA || insubs) {
@@ -1268,6 +1276,7 @@ int main(int argc, char *argv[])
         /* sub-integrations in time  */
 
         dtmp = (double) cmd->npart;
+        #pragma omp parallel for schedule(static)
         for (ii = 0; ii < cmd->npart; ii++) {
             parttimes[ii] = ii * reads_per_part * proftime;
 
@@ -1443,6 +1452,7 @@ int main(int argc, char *argv[])
         /* to be delayed a number of bins between the first and last time. */
 
         dphase = po / search.proflen;
+        #pragma omp parallel for schedule(static)
         for (ii = 0; ii < numtrials; ii++) {
             totpdelay = ii - (numtrials - 1) / 2;
             dtmp = (double) (totpdelay * search.pstep) / search.proflen;
@@ -1553,7 +1563,7 @@ int main(int argc, char *argv[])
                        "                You almost certainly want some type of -nosearch!!\n",
                        totnumtrials);
             }
-
+            #pragma omp parallel for schedule(static)
             for (idm = lodmnum; idm < numdmtrials; idm++) {     /* Loop over DMs */
                 if (cmd->nsub > 1) {    /* This is only for doing DM searches */
                     if (!cmd->nodmsearchP)
@@ -1561,7 +1571,7 @@ int main(int argc, char *argv[])
                     correct_subbands_for_DM(search.dms[idm], &search, ddprofs,
                                             ddstats);
                 }
-
+              
                 for (ipdd = 0; ipdd < numpdds; ipdd++) {        /* Loop over pdds */
                     if (!cmd->nosearchP)
                         good_ipdd = ipdd;
