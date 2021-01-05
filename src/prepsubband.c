@@ -195,7 +195,7 @@ int main(int argc, char *argv[])
             cmd->nsub = s.num_files;
             s.N = chkfilelen(s.files[0], sizeof(short));
             s.padvals = gen_fvect(s.num_files);
-            #pragma omp parrllel for simd
+            #pragma omp parallel for simd
             for (ii = 0; ii < s.num_files; ii++)
                 s.padvals[ii] = 0.0;
             s.start_MJD = (long double *) malloc(sizeof(long double));
@@ -834,7 +834,7 @@ static void write_padding(FILE * outfiles[], int numfiles, float value,
             for (ii = 0; ii < numfiles; ii++)
                 chkfwrite(buffer, sizeof(float), veclen, outfiles[ii]);
         } else {
-            #pragma omp parallel for schedule(staitc)
+            #pragma omp parallel for schedule(static)
             for (ii = 0; ii < numtowrite / veclen; ii++) {
                 for (jj = 0; jj < numfiles; jj++)
                     chkfwrite(buffer, sizeof(float), veclen, outfiles[jj]);
@@ -874,12 +874,19 @@ static int read_PRESTO_subbands(FILE * infiles[], int numfiles,
                 run_avg += (float) subsdata[jj];
             run_avg /= numread;
         }
+        index = ii;
         #pragma omp simd
-        for (jj = 0, index = ii; jj < numread; jj++, index += numfiles)
+        for (jj = 0; jj < numread; jj++)
+        {
             subbanddata[index] = (float) subsdata[jj] - run_avg;
+            index += numfiles;
+        }
         #pragma omp simd
-        for (jj = numread; jj < SUBSBLOCKLEN; jj++, index += numfiles)
+        for (jj = numread; jj < SUBSBLOCKLEN; jj++)
+        {    
             subbanddata[index] = 0.0;
+            index += numfiles;
+        }
     }
 
     if (mask) {
