@@ -966,10 +966,10 @@ int main(int argc, char *argv[])
     search.npart = cmd->npart;
     search.rawfolds = gen_dvect(cmd->nsub * cmd->npart * search.proflen);
     search.stats = (foldstats *) malloc(sizeof(foldstats) * cmd->nsub * cmd->npart);
-    #pragma omp parallel for schedule(static)
+    #pragma omp parallel for simd schedule(static)
     for (ii = 0; ii < cmd->npart * cmd->nsub * search.proflen; ii++)
         search.rawfolds[ii] = 0.0;
-    #pragma omp parallel for schedule(static)
+    #pragma omp parallel for simd schedule(static)
     for (ii = 0; ii < cmd->npart * cmd->nsub; ii++) {
         search.stats[ii].numdata = 0.0;
         search.stats[ii].data_avg = 0.0;
@@ -1081,6 +1081,7 @@ int main(int argc, char *argv[])
                      "  in prepfold (npart = %ld):  totalphs = %.6f but calctotalphs = %0.6f\n",
                      ii, totalphs, calctotalphs);
             cts = 0.0;
+            #pragma omp simd
             for (jj = ii * search.proflen; jj < (ii + 1) * search.proflen; jj++)
                 cts += search.rawfolds[jj];
             search.stats[ii].numdata = ceil((T / cmd->npart) / search.dt);
@@ -1092,6 +1093,7 @@ int main(int argc, char *argv[])
             /* Compute the Chi-Squared probability that there is a signal */
             /* See Leahy et al., ApJ, Vol 266, pp. 160-170, 1983 March 1. */
             search.stats[ii].redchi = 0.0;
+            #pragma omp simd
             for (jj = ii * search.proflen; jj < (ii + 1) * search.proflen; jj++) {
                 dtmp = search.rawfolds[jj] - search.stats[ii].prof_avg;
                 search.stats[ii].redchi += dtmp * dtmp;
@@ -1106,8 +1108,10 @@ int main(int argc, char *argv[])
 
         buffers = gen_dvect(cmd->nsub * search.proflen);
         phasesadded = gen_dvect(cmd->nsub);
+        #pragma omp parallel for simd schedule(static)
         for (ii = 0; ii < cmd->nsub * search.proflen; ii++)
             buffers[ii] = 0.0;
+        #pragma omp parallel for simd schedule(static)
         for (ii = 0; ii < cmd->nsub; ii++)
             phasesadded[ii] = 0.0;
 
@@ -1125,6 +1129,7 @@ int main(int argc, char *argv[])
                 if (insubs)
                     reclen = SUBSBLOCKLEN;
                 /* Use a loop to accommodate subband data */
+                #pragma omp parallel for schedule(static)
                 for (ii = 0; ii < s.num_files; ii++)
                     chkfileseek(s.files[ii], lorec * reclen, sizeof(short),
                                 SEEK_SET);
@@ -1152,7 +1157,7 @@ int main(int argc, char *argv[])
             voverc = gen_dvect(numbarypts);
 
             /* topocentric times in days from data start */
-
+	    #pragma omp parallel for simd schedule(static)
             for (ii = 0; ii < numbarypts; ii++)
                 topotimes[ii] = search.tepoch + (double) ii *TDT / SECPERDAY;
 
@@ -1163,7 +1168,7 @@ int main(int argc, char *argv[])
                        rastring, decstring, obs, ephem);
 
             /* Determine the avg v/c of the Earth's motion during the obs */
-
+	    #pragma omp parallel for simd schedule(static)
             for (ii = 0; ii < numbarypts - 1; ii++)
                 search.avgvoverc += voverc[ii];
             search.avgvoverc /= (numbarypts - 1.0);
@@ -1190,7 +1195,7 @@ int main(int argc, char *argv[])
             /* topocentric reference times.                   */
 
             if (binary) {
-                #pragma omp parallel for schedule(static)
+                #pragma omp parallel for simd schedule(static)
                 for (ii = 0; ii < numbinpoints; ii++) {
                     arrayoffset++;      /* Beware nasty NR zero-offset kludges! */
                     dtmp = search.bepoch + tp[ii] / SECPERDAY;
@@ -1203,7 +1208,7 @@ int main(int argc, char *argv[])
                 }
                 numdelays = numbinpoints;
                 dtmp = tp[0];
-                #pragma omp parallel for schedule(static)
+                #pragma omp parallel for simd schedule(static)
                 for (ii = 0; ii < numdelays; ii++)
                     tp[ii] = (tp[ii] - dtmp) * SECPERDAY;
             }
@@ -1229,10 +1234,11 @@ int main(int argc, char *argv[])
             search.lofreq = idata.freq;
             search.bestdm = idata.dm;
             search.chan_wid = idata.chan_wid;
-            #pragma omp parallel for schedule(static)
+            #pragma omp parallel for simd schedule(static)
             for (ii = 1; ii < numchan; ii++)
                 obsf[ii] = obsf[0] + ii * idata.chan_wid;
             if (RAWDATA || insubs) {
+            	 #pragma omp parallel for simd schedule(static)
                 for (ii = 0; ii < numchan; ii++)
                     obsf[ii] = doppler(obsf[ii], search.avgvoverc);
             }
@@ -1243,6 +1249,7 @@ int main(int argc, char *argv[])
                                                 search.avgvoverc);
                 idispdts = gen_ivect(numchan);
                 /* Convert the delays in seconds to delays in bins */
+                #pragma omp parallel for simd schedule(static)
                 for (ii = 0; ii < numchan; ii++)
                     idispdts[ii] = (int) (dispdts[ii] / search.dt + 0.5);
                 vect_free(dispdts);
@@ -1304,6 +1311,7 @@ int main(int argc, char *argv[])
                     else
                         numread = read_floats(s.files[0], data, worklen, numchan);
                     if (cmd->runavgP) {
+                    	#pragma omp simd
                         for (mm = 0; mm < numread; mm++)
                             runavg += data[mm];
                         runavg /= numread;
@@ -1314,6 +1322,7 @@ int main(int argc, char *argv[])
                             runavg = 0.95 * oldrunavg + 0.05 * runavg;
                         }
                         oldrunavg = runavg;
+                        #pragma omp simd
                         for (mm = 0; mm < numread; mm++)
                             data[mm] -= runavg;
                     }
@@ -1357,6 +1366,7 @@ int main(int argc, char *argv[])
                         int dataptr;
                         double avg, var;
                         avg_var(data + kk * worklen, numread, &avg, &var);
+                        #pragma omp simd
                         for (dataptr = 0; dataptr < worklen; dataptr++)
                             data[kk * worklen + dataptr] -= avg;
                     }
@@ -1452,7 +1462,7 @@ int main(int argc, char *argv[])
         /* to be delayed a number of bins between the first and last time. */
 
         dphase = po / search.proflen;
-        #pragma omp parallel for schedule(static)
+        #pragma omp parallel for simd schedule(static)
         for (ii = 0; ii < numtrials; ii++) {
             totpdelay = ii - (numtrials - 1) / 2;
             dtmp = (double) (totpdelay * search.pstep) / search.proflen;
@@ -1501,6 +1511,7 @@ int main(int argc, char *argv[])
                     /* Find the closest DM to the requested DM */
                     if (cmd->nodmsearchP) {
                         double mindmerr = 1000.0, dmerr, trialdm;
+                        #pragma omp simd
                         for (idm = 0; idm < numdmtrials; idm++) {       /* Loop over DMs */
                             trialdm = lodm + idm * ddm;
                             dmerr = fabs(trialdm - cmd->dm);
@@ -1511,6 +1522,7 @@ int main(int argc, char *argv[])
                         }
                     }
                 }
+                #pragma omp simd
                 for (idm = 0; idm < numdmtrials; idm++)
                     search.dms[idm] = lodm + idm * ddm;
 
@@ -1571,21 +1583,23 @@ int main(int argc, char *argv[])
                     correct_subbands_for_DM(search.dms[idm], &search, ddprofs,
                                             ddstats);
                 }
-              
+              	
                 for (ipdd = 0; ipdd < numpdds; ipdd++) {        /* Loop over pdds */
                     if (!cmd->nosearchP)
                         good_ipdd = ipdd;
+                    #pragma omp simd
                     for (ii = 0; ii < cmd->npart; ii++)
                         pdd_delays[ii] = cmd->searchpddP ?
                             fdotdot2phasedelay(fdotdots[ipdd],
                                                parttimes[ii]) * search.proflen : 0.0;
-
+		     
                     for (ipd = 0; ipd < numtrials; ipd++) {     /* Loop over the pds */
                         if (!cmd->nopdsearchP)
                             good_ipd = ipd;
                         else if (cmd->nopdsearchP && cmd->nsub > 1
                                  && ipd != good_ipd)
                             continue;
+                        #pragma omp simd
                         for (ii = 0; ii < cmd->npart; ii++)
                             pd_delays[ii] = pdd_delays[ii] +
                                 fdot2phasedelay(fdots[ipd],
@@ -1598,6 +1612,7 @@ int main(int argc, char *argv[])
                                      && ip != good_ip)
                                 continue;
                             totpdelay = search.pstep * (ip - (numtrials - 1) / 2);
+                            #pragma omp simd
                             for (ii = 0; ii < cmd->npart; ii++)
                                 delays[ii] =
                                     pd_delays[ii] +
