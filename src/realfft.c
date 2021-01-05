@@ -75,7 +75,7 @@ int main(int argc, char *argv[])
     {
         int hassuffix = 0, new_hassuffix = 0, filenmlen;
         char *dir, *filenm, *root, *suffix;
-
+        #pragma omp parallel for schedule(static)
         for (ii = 0; ii < numfiles; ii++) {
             if (ii == 0) {
                 split_path_file(cmd->argv[0], &datdir, &filenm);
@@ -199,6 +199,7 @@ int main(int argc, char *argv[])
             }
             maxslen = 2 * maxslen + 10;
             cmd = (char *) calloc(maxslen, 1);
+            #pragma omp parallel for schedule(static)
             for (ii = 0; ii < datfile->numfiles; ii++) {
                 suf = split_root_suffix(datfile->filenames[ii], &root, &suffix);
                 sprintf(cmd, "cp %s %s.bak", datfile->filenames[ii], root);
@@ -247,6 +248,7 @@ int main(int argc, char *argv[])
             maxslen = maxslen + 5;
             file1 = (char *) calloc(maxslen, 1);
             file2 = (char *) calloc(maxslen, 1);
+            #pragma omp parallel for schedule(static)
             for (ii = 0; ii < datfile->numfiles; ii++) {
                 suf = split_root_suffix(datfile->filenames[ii], &root, &suffix);
                 sprintf(file1, "%s.%s", root, datsuffix);
@@ -313,7 +315,7 @@ int main(int argc, char *argv[])
        fftw_print_max_memory_usage();
        fftw_check_memory_leaks();
      */
-
+    #pragma omp parallel for schedule(static)
     for (ii = 0; ii < numfiles; ii++) {
         free(datfilenms[ii]);
         free(tmpfilenms[ii]);
