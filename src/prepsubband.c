@@ -368,7 +368,7 @@ int main(int argc, char *argv[])
         dispdt = subband_search_delays(s.num_channels, cmd->nsub, avgdm,
                                        idata.freq, idata.chan_wid, 0.0);
         idispdt = gen_ivect(s.num_channels);
-        #pragma omp parallel for simd schedule(static) 
+        #pragma omp parallel for schedule(static) 
         for (ii = 0; ii < s.num_channels; ii++) //loop to find nearest ?
             idispdt[ii] = NEAREST_LONG(dispdt[ii] / idata.dt);
         vect_free(dispdt);
@@ -376,7 +376,7 @@ int main(int argc, char *argv[])
         /* The subband dispersion delays (see note above) */
 
         offsets = gen_imatrix(cmd->numdms, cmd->nsub);
-        #pragma omp parallel for simd shared(offsets) schedule(dynamic)
+        #pragma omp parallel for shared(offsets) schedule(dynamic)
         for (ii = 0; ii < cmd->numdms; ii++) {  //可优化二层循环2  先遍历dm，再遍历子带
             double *subdispdt;
 
